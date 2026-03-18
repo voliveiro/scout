@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scout — Research Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:       #E3120B;
+  --red-dark:  #b00d08;
+  --bg:        #ffffff;
+  --bg-warm:   #FAF8F5;
+  --bg-rule:   #F2EFE9;
+  --border:    #CDCAC4;
+  --border-dk: #9B9891;
+  --ink:       #121110;
+  --ink2:      #3D3B38;
+  --ink3:      #7A7773;
+  --ink4:      #B0ADA8;
+  --teal:      #006B6B;
+  --teal-bg:   #EBF4F4;
+  --gold:      #7A5C00;
+  --gold-bg:   #FBF6E6;
+  --serif:     'Merriweather', Georgia, serif;
+  --sans:      'Merriweather Sans', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── MASTHEAD ── */
+.masthead {
+  background: var(--ink);
+  color: #fff;
+  padding: 0 32px;
+  display: flex;
+  align-items: stretch;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.masthead-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-right: 24px;
+  border-right: 1px solid rgba(255,255,255,0.15);
+  margin-right: 20px;
+}
+
+.masthead-name {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.masthead-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.masthead-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}
+.dot.running {
+  background: #ff6b4a;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.dot.done { background: #4caf7d; }
+.dot.error { background: #ff4444; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ── RED RULE ── */
+.red-rule {
+  height: 4px;
+  background: var(--red);
+  flex-shrink: 0;
+}
+
+/* ── LAYOUT ── */
+.shell { display: flex; flex-direction: column; height: 100vh; }
+.body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-warm);
+  overflow-y: auto;
+  padding: 24px 0 16px;
+}
+
+.nav-section {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink4);
+  padding: 0 20px 8px;
+  margin-top: 20px;
+}
+.nav-section:first-child { margin-top: 0; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink3);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.12s;
+}
+.nav-item:hover { background: var(--bg-rule); color: var(--ink); }
+.nav-item.active {
+  border-left-color: var(--red);
+  background: #FEF0EF;
+  color: var(--red-dark);
+  font-weight: 600;
+}
+
+/* ── MAIN ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 8px 20px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--red-dark);
+  border-color: var(--red-dark);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink2);
+  border-color: var(--border-dk);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--teal);
+  border-color: var(--teal);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--teal-bg);
+}
+
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.prog-wrap {
+  flex: 1; max-width: 160px;
+  height: 3px;
+  background: var(--bg-rule);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.prog-bar {
+  height: 100%;
+  background: var(--red);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.prog-label {
+  font-size: 12px;
+  color: var(--ink3);
+  min-width: 52px;
+  font-weight: 500;
+}
+.spacer { flex: 1; }
+
+/* ── PANELS ── */
+.panel { display: none; flex: 1; overflow-y: auto; padding: 28px 32px; flex-direction: column; gap: 24px; }
+.panel.active { display: flex; }
+
+/* ── RESULT CARDS ── */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  overflow: hidden;
+  animation: slideIn 0.2s ease;
+}
+.card.card-research { border-top-color: var(--teal); }
+.card.card-events   { border-top-color: var(--gold); }
+.card.card-analysis { border-top-color: var(--red); }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--bg-rule);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-warm);
+}
+
+.card-entity {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1;
+}
+
+.tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 1px;
+}
+.tag-research { background: var(--teal-bg); color: var(--teal); }
+.tag-events   { background: var(--gold-bg);  color: var(--gold); }
+.tag-analysis { background: #FEF0EF; color: var(--red-dark); }
+
+.card-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+.item {
+  padding: 14px 16px;
+  border-left: 3px solid var(--border);
+  background: var(--bg-warm);
+  transition: border-color 0.12s;
+}
+.item:hover { border-left-color: var(--red); }
+
+.item-title {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.45;
+  margin-bottom: 5px;
+}
+
+.item-byline {
+  font-size: 12px;
+  color: var(--red-dark);
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.item-summary {
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.7;
+  font-family: var(--serif);
+  font-weight: 300;
+}
+
+/* ── ANALYSIS ── */
+.analysis-block {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--ink2);
+  white-space: pre-wrap;
+  font-weight: 300;
+}
+
+/* ── LOG ── */
+.log-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px;
+  font-family: 'Courier New', monospace;
+  background: var(--bg-warm);
+}
+.log-line { font-size: 12px; line-height: 1.7; color: var(--ink3); }
+.log-line.success { color: var(--teal); }
+.log-line.error { color: var(--red); }
+.log-line.heading { color: var(--ink); font-weight: bold; margin-top: 8px; }
+.log-line.sub { color: var(--ink2); padding-left: 16px; border-left: 2px solid var(--border); }
+
+/* ── SOURCES TABLE ── */
+.sources-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sources-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--ink);
+  background: var(--bg-warm);
+}
+.sources-table td { padding: 11px 14px; border-bottom: 1px solid var(--bg-rule); color: var(--ink2); }
+.sources-table tr:hover td { background: var(--bg-warm); }
+.url-cell { font-size: 11px; color: var(--ink4); word-break: break-all; font-family: monospace; }
+
+.del-btn {
+  font-size: 12px;
+  color: var(--ink4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 8px;
+  transition: all 0.12s;
+  font-family: var(--sans);
+}
+.del-btn:hover { color: var(--red); }
+
+.add-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.inp {
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1.5px solid var(--border-dk);
+  color: var(--ink);
+  border-radius: 2px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.inp:focus { border-color: var(--red); }
+.inp.wide { flex: 1; }
+.inp.sm { width: 130px; }
+
+/* ── RUNS ── */
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bg-rule);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.run-row:hover { background: var(--bg-warm); }
+.run-date { font-family: var(--serif); font-size: 15px; color: var(--ink); min-width: 110px; font-weight: 400; }
+.run-meta { font-size: 13px; color: var(--ink3); flex: 1; }
+.run-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+}
+.run-badge.done { background: var(--teal-bg); color: var(--teal); }
+.run-badge.running { background: #FEF0EF; color: var(--red-dark); }
+
+/* ── EMPTY ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  gap: 12px;
+  text-align: center;
+}
+.empty-rule {
+  width: 40px; height: 3px;
+  background: var(--red);
+  margin-bottom: 8px;
+}
+.empty-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  color: var(--ink2);
+  font-weight: 400;
+}
+.empty-sub { font-size: 13px; color: var(--ink4); }
+
+/* ── DIFF HEADER ── */
+.diff-header {
+  background: var(--gold-bg);
+  border-left: 4px solid var(--gold);
+  padding: 14px 20px;
+  font-size: 14px;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-rule); }
+::-webkit-scrollbar-thumb { background: var(--border-dk); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-name">SCOUT</span>
+      <span class="brand-sub">Research Intelligence Agent</span>
+    </div>
+    <div class="status">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">IDLE</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="sidebar">
+      <div class="nav-section">Views</div>
+      <div class="nav-item active" onclick="nav('results')" id="nav-results"><span class="icon">◎</span> Latest Results</div>
+      <div class="nav-item" onclick="nav('analysis')" id="nav-analysis"><span class="icon">◈</span> Analysis</div>
+      <div class="nav-item" onclick="nav('diff')" id="nav-diff"><span class="icon">Δ</span> What's New</div>
+      <div class="nav-section">History</div>
+      <div class="nav-item" onclick="nav('runs')" id="nav-runs"><span class="icon">▤</span> Past Runs</div>
+      <div class="nav-section">Config</div>
+      <div class="nav-item" onclick="nav('sources')" id="nav-sources"><span class="icon">⊞</span> Sources</div>
+      <div class="nav-item" onclick="nav('log')" id="nav-log"><span class="icon">≡</span> Activity Log</div>
+    </div>
+
+    <div class="main">
+      <div class="toolbar">
+        <button class="btn primary" id="runBtn" onclick="startRun()">▶ RUN SCOUT</button>
+        <button class="btn" id="analyseBtn" onclick="runAnalysis()" disabled>◈ ANALYSE</button>
+        <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
+        <div class="prog-label" id="progLabel"></div>
+        <div class="spacer"></div>
+        <button class="btn amber" id="digestBtn" onclick="downloadDigest()" disabled>⬇ DIGEST</button>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="panel active" id="panel-results">
+        <div id="resultsContent">
+          <div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No results yet — run Scout</div></div>
+        </div>
+      </div>
+
+      <!-- ANALYSIS -->
+      <div class="panel" id="panel-analysis">
+        <div id="analysisContent">
+          <div class="empty"><div class="empty-icon">◈</div><div class="empty-text">Run Scout then click Analyse</div></div>
+        </div>
+      </div>
+
+      <!-- DIFF -->
+      <div class="panel" id="panel-diff">
+        <div id="diffContent">
+          <div class="empty"><div class="empty-icon">Δ</div><div class="empty-text">Need two runs to compare</div></div>
+        </div>
+      </div>
+
+      <!-- RUNS -->
+      <div class="panel" id="panel-runs">
+        <div id="runsContent">
+          <div class="empty"><div class="empty-icon">▤</div><div class="empty-text">No past runs</div></div>
+        </div>
+      </div>
+
+      <!-- SOURCES -->
+      <div class="panel" id="panel-sources">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Source URLs</span></div>
+          <div class="card-body">
+            <table class="sources-table">
+              <thead><tr><th>Institution</th><th>Type</th><th>URL</th><th></th></tr></thead>
+              <tbody id="sourcesBody"></tbody>
+            </table>
+            <div class="add-form">
+              <input class="inp sm" id="addEntity" placeholder="Institution" />
+              <select class="inp sm" id="addType" style="cursor:pointer">
+                <option>Research</option><option>Events</option>
+              </select>
+              <input class="inp wide" id="addUrl" placeholder="https://..." />
+              <button class="btn primary" onclick="addSource()">+ ADD</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div class="panel" id="panel-log">
+        <div class="log-wrap" id="logArea"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentRunId = null;
+let activePanel = 'results';
+let activeEventSource = null;
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function nav(name) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  activePanel = name;
+  if (name === 'sources') loadSources();
+  if (name === 'runs') loadRuns();
+  if (name === 'diff') loadDiff();
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+function setStatus(state, label) {
+  document.getElementById('statusDot').className = 'dot ' + state;
+  document.getElementById('statusText').textContent = label || state.toUpperCase();
+}
+
+function log(msg, cls='') {
+  const ts = new Date().toLocaleTimeString('en-SG', {hour12:false});
+  const area = document.getElementById('logArea');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + cls;
+  line.textContent = `[${ts}] ${msg}`;
+  area.appendChild(line);
+  area.scrollTop = area.scrollHeight;
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+async function startRun() {
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('analyseBtn').disabled = true;
+  document.getElementById('digestBtn').disabled = true;
+  document.getElementById('resultsContent').innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">Scanning…</div></div>';
+  setStatus('running', 'RUNNING');
+  log('Scout run started.', 'heading');
+  nav('results');
+
+  let total = 0;
+  let done = 0;
+
+  if (activeEventSource) activeEventSource.close();
+  activeEventSource = new EventSource('/api/run');
+
+  // POST to trigger, SSE streams back
+  // Actually we need to POST first:
+  activeEventSource.close();
+
+  const resp = await fetch('/api/run', { method: 'POST' });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done: streamDone, value } = await reader.read();
+    if (streamDone) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const event = JSON.parse(line.slice(6));
+      handleRunEvent(event, { get total() { return total; }, set total(v) { total = v; }, get done() { return done; }, set done(v) { done = v; } });
+    }
+  }
+}
+
+function handleRunEvent(event, state) {
+  if (event.type === 'run_start') {
+    state.total = event.total;
+    currentRunId = event.run_id;
+    log(`Run #${event.run_id} started — ${event.total} URLs queued.`);
+    document.getElementById('progLabel').textContent = `0/${event.total}`;
+  }
+  else if (event.type === 'url_start') {
+    log(`→ [${event.index+1}/${state.total}] ${event.entity} / ${event.source_type}`, 'heading');
+  }
+  else if (event.type === 'url_done') {
+    state.done++;
+    const pct = (state.done / state.total * 100).toFixed(0);
+    document.getElementById('progBar').style.width = pct + '%';
+    document.getElementById('progLabel').textContent = `${state.done}/${state.total}`;
+    log(`  ✓ ${event.count} item(s) extracted.`, 'success');
+    event.items.forEach(it => log(`    · ${it.author || it.speaker || '—'} — ${(it.title||'').substring(0,55)}`, 'sub'));
+    appendResultCard(event);
+  }
+  else if (event.type === 'url_error') {
+    state.done++;
+    log(`  ✗ ${event.url}: ${event.error}`, 'error');
+  }
+  else if (event.type === 'run_complete') {
+    setStatus('done', 'DONE');
+    log(`Run complete. ${event.total_items} items, ${event.errors} errors.`, 'success');
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('analyseBtn').disabled = false;
+    document.getElementById('digestBtn').disabled = false;
+  }
+  else if (event.type === 'done') {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+function appendResultCard(event) {
+  const content = document.getElementById('resultsContent');
+  const empty = content.querySelector('.empty');
+  if (empty) empty.remove();
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  const itemsHtml = (event.items || []).map(it => `
+    <div class="item">
+      <div class="item-title">${it.title || '(Untitled)'}</div>
+      ${it.author ? `<div class="item-sub">${it.author}</div>` : ''}
+      ${it.speaker ? `<div class="item-sub">${it.speaker}</div>` : ''}
+      <div class="item-summary">${it.summary || ''}</div>
+    </div>`).join('');
+
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">${event.entity}</span>
+      <span class="tag ${event.source_type.toLowerCase()}">${event.source_type}</span>
+    </div>
+    <div class="card-body">${itemsHtml || '<div style="font-size:11px;color:var(--text3)">No items extracted.</div>'}</div>`;
+  content.appendChild(card);
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!currentRunId) { alert('Run Scout first.'); return; }
+  document.getElementById('analyseBtn').disabled = true;
+  setStatus('running', 'ANALYSING');
+  nav('analysis');
+  document.getElementById('analysisContent').innerHTML = '<div class="empty"><div class="empty-icon">◈</div><div class="empty-text">Analysing…</div></div>';
+  log('Analysis started.', 'heading');
+
+  const resp = await fetch(`/api/analyse/${currentRunId}`, { method: 'POST' });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const event = JSON.parse(line.slice(6));
+      if (event.type === 'analysis_start') {
+        log(`◈ Running: ${event.label}…`);
+      }
+      else if (event.type === 'analysis_done') {
+        log(`  ✓ ${event.label} complete.`, 'success');
+        appendAnalysisCard(event);
+      }
+      else if (event.type === 'done') {
+        setStatus('done', 'DONE');
+        document.getElementById('analyseBtn').disabled = false;
+      }
+    }
+  }
+}
+
+function appendAnalysisCard(event) {
+  const content = document.getElementById('analysisContent');
+  const empty = content.querySelector('.empty');
+  if (empty) empty.remove();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">${event.label}</span>
+      <span class="tag analysis">Analysis</span>
+    </div>
+    <div class="card-body"><div class="analysis-block">${event.content}</div></div>`;
+  content.appendChild(card);
+}
+
+// ── Diff ──────────────────────────────────────────────────────────────────────
+async function loadDiff() {
+  const resp = await fetch('/api/diff');
+  const data = await resp.json();
+  const content = document.getElementById('diffContent');
+  if (data.message) {
+    content.innerHTML = `<div class="empty"><div class="empty-icon">Δ</div><div class="empty-text">${data.message}</div></div>`;
+    return;
+  }
+  if (!data.items.length) {
+    content.innerHTML = `<div class="empty"><div class="empty-icon">Δ</div><div class="empty-text">No new items since last run</div></div>`;
+    return;
+  }
+  const itemsHtml = data.items.map(it => `
+    <div class="item">
+      <div class="item-title">${it.title || '(Untitled)'}</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:3px">${it.entity} / ${it.type}</div>
+      ${it.author ? `<div class="item-sub">${it.author}</div>` : ''}
+      ${it.speaker ? `<div class="item-sub">${it.speaker}</div>` : ''}
+      <div class="item-summary">${it.summary || ''}</div>
+    </div>`).join('');
+  content.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">${data.new_count} new items since last run</span><span class="tag analysis">Diff</span></div>
+      <div class="card-body">${itemsHtml}</div>
+    </div>`;
+}
+
+// ── Runs ──────────────────────────────────────────────────────────────────────
+async function loadRuns() {
+  const resp = await fetch('/api/runs');
+  const runs = await resp.json();
+  const content = document.getElementById('runsContent');
+  if (!runs.length) {
+    content.innerHTML = '<div class="empty"><div class="empty-icon">▤</div><div class="empty-text">No past runs</div></div>';
+    return;
+  }
+  content.innerHTML = runs.map(r => `
+    <div class="run-row" onclick="viewRun(${r.id})">
+      <div>
+        <div class="run-date">${r.started_at.substring(0,10)}</div>
+        <div class="run-meta">${r.total_items || 0} items · ${r.total_urls || 0} URLs</div>
+      </div>
+      <div class="spacer"></div>
+      <span class="run-badge ${r.status}">${r.status}</span>
+      <button class="btn amber" style="font-size:10px;padding:4px 10px" onclick="event.stopPropagation();viewDigest(${r.id})">digest</button>
+    </div>`).join('');
+}
+
+async function viewRun(runId) {
+  currentRunId = runId;
+  const resp = await fetch(`/api/runs/${runId}/items`);
+  const items = await resp.json();
+  document.getElementById('resultsContent').innerHTML = '';
+  const groups = {};
+  items.forEach(it => {
+    const k = it.entity + '|' + it.type;
+    if (!groups[k]) groups[k] = { entity: it.entity, source_type: it.type, items: [] };
+    groups[k].items.push(it);
+  });
+  Object.values(groups).forEach(g => appendResultCard(g));
+  document.getElementById('digestBtn').disabled = false;
+  document.getElementById('analyseBtn').disabled = false;
+  nav('results');
+}
+
+function viewDigest(runId) { window.open(`/api/digest/${runId}`, '_blank'); }
+function downloadDigest() { if (currentRunId) viewDigest(currentRunId); }
+
+// ── Sources ───────────────────────────────────────────────────────────────────
+async function loadSources() {
+  const resp = await fetch('/api/sources');
+  const sources = await resp.json();
+  document.getElementById('sourcesBody').innerHTML = sources.map(s => `
+    <tr>
+      <td>${s.entity}</td>
+      <td><span class="tag ${s.type.toLowerCase()}">${s.type}</span></td>
+      <td style="font-size:10px;color:var(--text3)">${s.url}</td>
+      <td><button class="del-btn" onclick="deleteSource(${s.id})">✕</button></td>
+    </tr>`).join('');
+}
+
+async function addSource() {
+  const entity = document.getElementById('addEntity').value.trim();
+  const type = document.getElementById('addType').value;
+  const url = document.getElementById('addUrl').value.trim();
+  if (!entity || !url) return;
+  await fetch('/api/sources', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({entity, type, url})
+  });
+  document.getElementById('addEntity').value = '';
+  document.getElementById('addUrl').value = '';
+  loadSources();
+}
+
+async function deleteSource(id) {
+  await fetch(`/api/sources/${id}`, {method:'DELETE'});
+  loadSources();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  // Load latest run if exists
+  const resp = await fetch('/api/runs');
+  const runs = await resp.json();
+  if (runs.length) {
+    const latest = runs[0];
+    currentRunId = latest.id;
+    document.getElementById('digestBtn').disabled = false;
+    document.getElementById('analyseBtn').disabled = false;
+    await viewRun(latest.id);
+    const analyses = await fetch(`/api/runs/${latest.id}/analyses`).then(r=>r.json());
+    if (analyses.length) {
+      document.getElementById('analysisContent').innerHTML = '';
+      analyses.forEach(a => appendAnalysisCard({label: a.type, content: a.content}));
+    }
+  }
+})();
+</script>
+</body>
+</html>

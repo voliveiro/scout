@@ -1,0 +1,298 @@
+"""
+Scout — Research Intelligence Agent
+Flask backend, port 5002
+Sibling to Nuncio (port 5001)
+"""
+
+import os
+import json
+import sqlite3
+import threading
+from datetime import datetime
+from flask import Flask, jsonify, request, render_template, Response, stream_with_context
+from dotenv import load_dotenv
+from scout_agent import ScoutAgent
+
+load_dotenv()
+
+app = Flask(__name__)
+DB_PATH = os.path.join(os.path.dirname(__file__), "data", "scout.db")
+
+# ── Database ──────────────────────────────────────────────────────────────────
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS runs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            started_at  TEXT NOT NULL,
+            finished_at TEXT,
+            status      TEXT DEFAULT 'running',
+            total_urls  INTEGER DEFAULT 0,
+            total_items INTEGER DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS items (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id      INTEGER NOT NULL,
+            entity      TEXT NOT NULL,
+            type        TEXT NOT NULL,
+            url         TEXT NOT NULL,
+            title       TEXT,
+            author      TEXT,
+            speaker     TEXT,
+            summary     TEXT,
+            first_seen  TEXT NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS analyses (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id      INTEGER NOT NULL,
+            type        TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES analyses(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS sources (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity  TEXT NOT NULL,
+            type    TEXT NOT NULL,
+            url     TEXT NOT NULL UNIQUE
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+def seed_sources():
+    """Load sources from sources.csv if table is empty."""
+    conn = get_db()
+    count = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+    if count == 0:
+        import csv
+        csv_path = os.path.join(os.path.dirname(__file__), "sources.csv")
+        if os.path.exists(csv_path):
+            with open(csv_path) as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO sources (entity, type, url) VALUES (?,?,?)",
+                        (row["Entity"], row["Type"], row["URL"])
+                    )
+            conn.commit()
+    conn.close()
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/api/sources", methods=["GET"])
+def get_sources():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM sources ORDER BY entity, type").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/sources", methods=["POST"])
+def add_source():
+    data = request.json
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO sources (entity, type, url) VALUES (?,?,?)",
+            (data["entity"], data["type"], data["url"])
+        )
+        conn.commit()
+        return jsonify({"status": "ok"})
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "URL already exists"}), 409
+    finally:
+        conn.close()
+
+@app.route("/api/sources/<int:source_id>", methods=["DELETE"])
+def delete_source(source_id):
+    conn = get_db()
+    conn.execute("DELETE FROM sources WHERE id = ?", (source_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route("/api/runs", methods=["GET"])
+def get_runs():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM runs ORDER BY started_at DESC LIMIT 20"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/runs/<int:run_id>/items", methods=["GET"])
+def get_run_items(run_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run_id,)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/runs/latest/items", methods=["GET"])
+def get_latest_items():
+    conn = get_db()
+    run = conn.execute(
+        "SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 1"
+    ).fetchone()
+    if not run:
+        return jsonify([])
+    rows = conn.execute(
+        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run["id"],)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/runs/<int:run_id>/analyses", methods=["GET"])
+def get_analyses(run_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM analyses WHERE run_id = ? ORDER BY created_at", (run_id,)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/diff", methods=["GET"])
+def get_diff():
+    """Return items that are new since the previous run."""
+    conn = get_db()
+    runs = conn.execute(
+        "SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 2"
+    ).fetchall()
+    if len(runs) < 2:
+        conn.close()
+        return jsonify({"message": "Need at least two completed runs to diff.", "items": []})
+    latest_id, prev_id = runs[0]["id"], runs[1]["id"]
+    prev_titles = set(
+        r["title"] for r in conn.execute(
+            "SELECT title FROM items WHERE run_id = ?", (prev_id,)
+        ).fetchall() if r["title"]
+    )
+    new_items = [
+        dict(r) for r in conn.execute(
+            "SELECT * FROM items WHERE run_id = ?", (latest_id,)
+        ).fetchall()
+        if r["title"] and r["title"] not in prev_titles
+    ]
+    conn.close()
+    return jsonify({"new_count": len(new_items), "items": new_items})
+
+@app.route("/api/digest/<int:run_id>", methods=["GET"])
+def get_digest(run_id):
+    """Return a plain-text shareable digest for a run."""
+    conn = get_db()
+    run = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+    items = conn.execute(
+        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run_id,)
+    ).fetchall()
+    analyses = conn.execute(
+        "SELECT * FROM analyses WHERE run_id = ?", (run_id,)
+    ).fetchall()
+    conn.close()
+
+    if not run:
+        return "Run not found", 404
+
+    lines = []
+    lines.append("SCOUT RESEARCH DIGEST")
+    lines.append("=" * 60)
+    lines.append(f"Run date: {run['started_at'][:10]}")
+    lines.append(f"Items collected: {run['total_items']}")
+    lines.append("")
+
+    # Analysis sections
+    for a in analyses:
+        lines.append(f"── {a['type'].upper()} ──")
+        lines.append(a["content"])
+        lines.append("")
+
+    # Items by institution
+    entities = list(dict.fromkeys(r["entity"] for r in items))
+    for entity in entities:
+        entity_items = [r for r in items if r["entity"] == entity]
+        lines.append("=" * 60)
+        lines.append(entity.upper())
+        lines.append("=" * 60)
+        for item in entity_items:
+            lines.append(f"\n[{item['type']}] {item['title'] or '(Untitled)'}")
+            if item["author"]:
+                lines.append(f"  Author: {item['author']}")
+            if item["speaker"]:
+                lines.append(f"  Speaker: {item['speaker']}")
+            if item["summary"]:
+                lines.append(f"  {item['summary']}")
+        lines.append("")
+
+    return Response(
+        "\n".join(lines),
+        mimetype="text/plain",
+        headers={"Content-Disposition": f"attachment; filename=scout_digest_{run_id}.txt"}
+    )
+
+# ── Run endpoint with SSE streaming ──────────────────────────────────────────
+
+_run_lock = threading.Lock()
+_run_active = False
+
+@app.route("/api/run", methods=["POST"])
+def start_run():
+    global _run_active
+    if _run_active:
+        return jsonify({"error": "A run is already in progress."}), 409
+
+    def generate():
+        global _run_active
+        _run_active = True
+        try:
+            agent = ScoutAgent(DB_PATH, os.getenv("ANTHROPIC_API_KEY"))
+            for event in agent.run():
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            _run_active = False
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+@app.route("/api/analyse/<int:run_id>", methods=["POST"])
+def analyse_run(run_id):
+    """Run analysis agents over a completed run's items."""
+    def generate():
+        agent = ScoutAgent(DB_PATH, os.getenv("ANTHROPIC_API_KEY"))
+        for event in agent.analyse(run_id):
+            yield f"data: {json.dumps(event)}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    init_db()
+    seed_sources()
+    print("Scout running on http://localhost:5002")
+    app.run(host="0.0.0.0", port=5002, debug=True)

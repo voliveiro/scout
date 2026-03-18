@@ -1,0 +1,35 @@
+cat > .gitignore << 'EOF'
+# === SECRETS — never commit these ===
+.env
+
+# === DATABASE ===
+data/scout.db
+data/*.db
+data/
+
+# === PYTHON ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+*.egg-info/
+
+# === FLASK ===
+instance/
+.webassets-cache
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === EDITOR ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === BACKUPS ===
+templates/*.bak
+EOF

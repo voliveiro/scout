@@ -1,0 +1,140 @@
+# Scout — Research Intelligence Agent
+
+Scout is a prototype AI agent that monitors policy research institutions, extracts recent publications and events, and runs analysis across the collected corpus.
+
+
+---
+
+## What Scout does
+
+Scout visits a configured list of policy institution websites and extracts:
+
+- **Research**: title, author, and a one- to two-sentence summary of each recent publication
+- **Events**: title, speaker, and a one- to two-sentence description of each upcoming or recent event
+
+After collecting, Scout runs three analysis passes over the corpus:
+
+- **Thematic clustering** — what themes are cutting across multiple institutions this week?
+- **Executive summary** — a short digest suitable for sharing with the team
+- **What's new** — a diff against the previous run, highlighting items that weren't there before
+
+Results are stored in a local SQLite database, so each run builds on the last. You can download a plain-text digest from any run to share with colleagues who don't have access to the tool.
+
+---
+
+## Why it's built this way
+
+Scout is a deliberately simple tool. Your Anthropic API key lives in a `.env` file on the server and never touches the browser. Teammates access Scout through the web interface without any credentials of their own.
+
+It's also a working example of an agentic AI system: Scout uses Claude with web search enabled to actually visit and read each URL, rather than just pattern-matching against a static dataset. This makes it more robust to page redesigns, but also means each run has real API cost and takes a few minutes to complete.
+
+---
+
+## Setup
+
+**Requirements:** Python 3.10+, an Anthropic API key with credits
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/your-username/scout.git
+cd scout
+
+# 2. Create a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment
+cp .env.example .env
+nano .env  # paste your ANTHROPIC_API_KEY
+
+# 5. Run
+python3 app.py
+```
+
+Scout will be available at `http://localhost:5002`.
+
+---
+
+## Using Scout
+
+1. **Run Scout** — click the button and Scout will work through all configured sources, streaming results to the screen as it goes. Expect 3–5 minutes for a full run.
+2. **Analyse** — once a run is complete, click Analyse. Scout will generate thematic clusters, an executive summary, and (from the second run onwards) a diff against the previous run.
+3. **Download Digest** — produces a plain-text file you can email or paste into a document.
+4. **Past Runs** — all runs are saved. You can revisit any previous run from the History tab.
+
+---
+
+## Adding or removing sources
+
+The easiest way is through the **Sources** tab in the UI — add an institution name, select Research or Events, and paste the URL. Changes take effect on the next run.
+
+To seed a fresh installation with a different set of institutions, edit `sources.csv` before the first run. The format is:
+
+```
+Entity,Type,URL
+Harvard Kennedy School,Research,https://www.hks.harvard.edu/research-insights/publications
+```
+
+---
+
+## Project structure
+
+```
+scout/
+├── app.py              # Flask app — routes, DB, streaming
+├── scout_agent.py      # AI agent loop (scrape + analyse)
+├── sources.csv         # Seed data, loaded once on first run
+├── requirements.txt
+├── .env.example        # Copy to .env and add your API key
+├── .gitignore
+├── data/
+│   └── scout.db        # SQLite database (auto-created, not committed)
+└── templates/
+    └── index.html      # Frontend
+```
+
+---
+
+## Extending Scout
+
+**New institutions:** Add them via the Sources tab or `sources.csv`. Any URL that lists publications or events should work — Scout uses Claude with web search, so it reads the page rather than scraping HTML directly.
+
+**New analysis types:** Add a new method to the `analyse()` loop in `scout_agent.py`, following the pattern of the existing three. Each analysis is a prompt over the full corpus, streamed back to the frontend.
+
+**Scheduling:** Scout doesn't run on a schedule by default. To run it weekly, add a cron job:
+
+```bash
+# Run Scout every Monday at 8am
+0 8 * * 1 cd /path/to/scout && venv/bin/python3 -c "
+from scout_agent import ScoutAgent
+import os
+from dotenv import load_dotenv
+load_dotenv()
+agent = ScoutAgent('data/scout.db', os.getenv('ANTHROPIC_API_KEY'))
+for _ in agent.run(): pass
+"
+```
+
+---
+
+## A note on costs
+
+Scout uses the Anthropic API with web search enabled. Each full run makes approximately 19–22 API calls (one per source URL, plus analysis). Using Claude Sonnet, a full run typically costs under $0.50 USD. API credits are managed separately from a Claude.ai Pro subscription at console.anthropic.com.
+
+---
+
+## Status
+
+This is a prototype. It works, but expect rough edges — error handling is minimal, there's no authentication on the web interface, and the analysis quality depends on how well Claude can read each institution's page structure. Contributions and issues welcome.
+
+---
+
+## Built with
+
+- [Flask](https://flask.palletsprojects.com/) — backend and SSE streaming
+- [Anthropic Python SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude with web search
+- [SQLite](https://www.sqlite.org/) — local persistence
+- [Merriweather](https://fonts.google.com/specimen/Merriweather) — because it deserved a decent font
