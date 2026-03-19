@@ -187,6 +187,26 @@ def get_analyses(run_id):
     conn.close()
     return jsonify([dict(r) for r in rows])
 
+@app.route("/api/runs/latest/diff-analysis", methods=["GET"])
+def get_latest_diff_analysis():
+    """Return the 'New Since Last Run' analysis from the most recent completed run."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 1")
+    run = cur.fetchone()
+    if not run:
+        cur.close()
+        conn.close()
+        return jsonify(None)
+    cur.execute(
+        "SELECT content FROM analyses WHERE run_id = %s AND type = 'New Since Last Run' ORDER BY created_at DESC LIMIT 1",
+        (run["id"],)
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return jsonify(row["content"] if row else None)
+
 @app.route("/api/diff", methods=["GET"])
 def get_diff():
     """Return items that are new since the previous run."""
@@ -253,7 +273,7 @@ def get_digest(run_id):
         lines.append("")
 
     run_date = datetime.fromisoformat(run["started_at"]).strftime("%Y%m%d-%H%M")
-    
+
     return Response(
         "\n".join(lines),
         mimetype="text/plain",

@@ -173,6 +173,10 @@ Your job is to write a concise, useful analytical summary for a team of governan
             "errors": errors
         }
 
+        # Auto-run analysis so diff commentary is always available
+        yield {"type": "log", "message": "Starting automatic analysis…"}
+        yield from self.analyse(run_id)
+
     def _scrape(self, url: str, source_type: str) -> list:
         print(f"SCRAPE START: {url}", flush=True)
         today = datetime.now().strftime("%d %B %Y")
