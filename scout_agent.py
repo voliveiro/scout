@@ -17,7 +17,12 @@ class ScoutAgent:
 
     SCRAPE_SYSTEM_RESEARCH = """You are Scout, a research intelligence agent working for a governance research team.
 You are given a URL for a policy research institution's publications page.
-Use web_search to visit the page and extract up to 6 recent research items.
+Today's date is {today}.
+
+Your task:
+1. Use web_search to visit the URL and extract research published in the PAST 30 DAYS only.
+2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages until you either reach items older than 30 days or run out of pages. Do not go beyond page 5.
+3. Ignore research older than 30 days.
 
 Return ONLY a JSON array. No markdown, no explanation, no preamble.
 Format:
@@ -25,16 +30,22 @@ Format:
   {
     "title": "Full title of the paper or report",
     "author": "Author name(s) or empty string if not found",
+    "date": "Publication date, e.g. 12 March 2026",
     "summary": "One or two sentences describing what this research is about and why it matters."
   }
 ]
 
-If you cannot find any items, return [].
+If you cannot find any items within the past 30 days, return [].
 """
 
     SCRAPE_SYSTEM_EVENTS = """You are Scout, a research intelligence agent working for a governance research team.
 You are given a URL for a policy institution's events page.
-Use web_search to visit the page and extract up to 6 upcoming or recent events.
+Today's date is {today}.
+
+Your task:
+1. Use web_search to visit the URL and extract upcoming or recent events from the PAST 30 DAYS only.
+2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages until you either reach events older than 30 days or run out of pages. Do not go beyond page 5.
+3. Ignore events older than 30 days.
 
 Return ONLY a JSON array. No markdown, no explanation, no preamble.
 Format:
@@ -42,11 +53,12 @@ Format:
   {
     "title": "Full title or name of the event",
     "speaker": "Speaker or panellist name(s), or empty string if not found",
+    "date": "Date of the event, e.g. 12 March 2026",
     "summary": "One or two sentences describing what the event is about and why it is significant."
   }
 ]
 
-If you cannot find any items, return [].
+If you cannot find any items within the past 30 days, return [].
 """
 
     ANALYSIS_SYSTEM = """You are Scout's analysis layer. You have been given a structured dataset of recent research publications and events collected from major policy institutions (Harvard Kennedy School, Oxford Blavatnik, Lee Kuan Yew School, Brookings, Chatham House, RAND).
@@ -99,8 +111,8 @@ Your job is to write a concise, useful analytical summary for a team of governan
                 for item in items:
                     cur.execute(
                         """INSERT INTO items
-                           (run_id, entity, type, url, title, author, speaker, summary, first_seen)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                           (run_id, entity, type, url, title, author, speaker, summary, date, first_seen)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
                             run_id,
                             source["entity"],
@@ -110,6 +122,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
                             item.get("author", ""),
                             item.get("speaker", ""),
                             item.get("summary", ""),
+                            item.get("date", ""),
                             now
                         )
                     )
@@ -153,15 +166,16 @@ Your job is to write a concise, useful analytical summary for a team of governan
         }
 
     def _scrape(self, url: str, source_type: str) -> list:
+        today = datetime.now().strftime("%d %B %Y")
         system = (
             self.SCRAPE_SYSTEM_RESEARCH
             if source_type == "Research"
             else self.SCRAPE_SYSTEM_EVENTS
-        )
+        ).format(today=today)
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=1500,
+            max_tokens=3000,
             system=system,
             tools=[{"type": "web_search_20250305", "name": "web_search"}],
             messages=[{
@@ -180,6 +194,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
         if bracket == -1:
             return []
         return json.loads(clean[bracket:])
+    
 
     # ── Analysis loop ─────────────────────────────────────────────────────────
 

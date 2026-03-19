@@ -48,6 +48,7 @@ def init_db():
             author      TEXT,
             speaker     TEXT,
             summary     TEXT,
+            date        TEXT,
             first_seen  TEXT NOT NULL
         )
     """)
