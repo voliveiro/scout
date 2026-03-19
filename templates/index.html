@@ -38,47 +38,41 @@ body {
 }
 
 /* ── MASTHEAD ── */
-.masthead {
+/* ── TOPBAR ── */
+.topbar {
   background: var(--ink);
   color: #fff;
   padding: 0 32px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   height: 52px;
   flex-shrink: 0;
-}
-
-.masthead-brand {
-  display: flex;
-  align-items: center;
   gap: 16px;
-  padding-right: 24px;
-  border-right: 1px solid rgba(255,255,255,0.15);
-  margin-right: 20px;
 }
 
-.masthead-name {
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.brand-name {
   font-family: var(--serif);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #fff;
+  line-height: 1.2;
 }
 
-.masthead-sub {
-  font-size: 11px;
+.brand-sub {
+  font-size: 10px;
   color: rgba(255,255,255,0.45);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 400;
-}
-
-.masthead-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-left: auto;
 }
 
 .status {
@@ -495,8 +489,8 @@ body {
 
   /* Show hamburger, hide masthead subtitle */
   .hamburger { display: flex; align-items: center; }
-  .masthead-sub { display: none; }
-  .masthead { padding: 0 16px; gap: 12px; }
+  .brand-sub { display: none; }
+  .topbar { padding: 0 16px; gap: 12px; }
 
   /* Sidebar slides in as a drawer */
   .sidebar {
