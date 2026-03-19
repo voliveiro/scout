@@ -6,8 +6,9 @@ Two responsibilities:
   2. analyse() — run analysis agents over a completed run's items
 """
 
-import sqlite3
 import json
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import anthropic
 
@@ -53,28 +54,29 @@ If you cannot find any items, return [].
 Your job is to write a concise, useful analytical summary for a team of governance researchers and public servants. Write in plain, direct prose — not bullet points. No preamble. Be specific, naming actual titles and institutions where relevant.
 """
 
-    def __init__(self, db_path: str, api_key: str):
-        self.db_path = db_path
+    def __init__(self, db_url: str, api_key: str):
+        self.db_url = db_url
         self.client = anthropic.Anthropic(api_key=api_key)
 
     def get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        conn = psycopg2.connect(self.db_url, sslmode='disable')
         return conn
 
     # ── Scrape loop ───────────────────────────────────────────────────────────
 
     def run(self):
         conn = self.get_db()
-        sources = conn.execute("SELECT * FROM sources ORDER BY entity, type").fetchall()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM sources ORDER BY entity, type")
+        sources = cur.fetchall()
 
         # Create run record
         now = datetime.now().isoformat()
-        cur = conn.execute(
-            "INSERT INTO runs (started_at, status, total_urls) VALUES (?,?,?)",
+        cur.execute(
+            "INSERT INTO runs (started_at, status, total_urls) VALUES (%s,%s,%s) RETURNING id",
             (now, "running", len(sources))
         )
-        run_id = cur.lastrowid
+        run_id = cur.fetchone()["id"]
         conn.commit()
 
         yield {"type": "run_start", "run_id": run_id, "total": len(sources)}
@@ -95,10 +97,10 @@ Your job is to write a concise, useful analytical summary for a team of governan
                 items = self._scrape(source["url"], source["type"])
                 saved = 0
                 for item in items:
-                    conn.execute(
+                    cur.execute(
                         """INSERT INTO items
                            (run_id, entity, type, url, title, author, speaker, summary, first_seen)
-                           VALUES (?,?,?,?,?,?,?,?,?)""",
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
                             run_id,
                             source["entity"],
@@ -135,11 +137,12 @@ Your job is to write a concise, useful analytical summary for a team of governan
                 }
 
         # Finalise run
-        conn.execute(
-            "UPDATE runs SET finished_at=?, status=?, total_items=? WHERE id=?",
+        cur.execute(
+            "UPDATE runs SET finished_at=%s, status=%s, total_items=%s WHERE id=%s",
             (datetime.now().isoformat(), "done", total_items, run_id)
         )
         conn.commit()
+        cur.close()
         conn.close()
 
         yield {
@@ -182,12 +185,13 @@ Your job is to write a concise, useful analytical summary for a team of governan
 
     def analyse(self, run_id: int):
         conn = self.get_db()
-        items = conn.execute(
-            "SELECT * FROM items WHERE run_id = ?", (run_id,)
-        ).fetchall()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM items WHERE run_id = %s", (run_id,))
+        items = cur.fetchall()
 
         if not items:
             yield {"type": "error", "message": "No items found for this run."}
+            cur.close()
             conn.close()
             return
 
@@ -202,8 +206,8 @@ Your job is to write a concise, useful analytical summary for a team of governan
 For each theme, name it, describe it in 2-3 sentences, and cite 2-3 specific items (by title and institution) that exemplify it.
 Focus on cross-institutional patterns — what are multiple institutions paying attention to simultaneously?"""
         )
-        conn.execute(
-            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (?,?,?,?)",
+        cur.execute(
+            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (%s,%s,%s,%s)",
             (run_id, "Thematic Clusters", themes, now)
         )
         conn.commit()
@@ -217,26 +221,24 @@ Focus on cross-institutional patterns — what are multiple institutions paying 
 Address: what is the dominant preoccupation this week, what is surprising or notable, and what gaps or silences are worth flagging.
 Write for a senior governance researcher who will share this with their team."""
         )
-        conn.execute(
-            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (?,?,?,?)",
+        cur.execute(
+            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (%s,%s,%s,%s)",
             (run_id, "Executive Summary", digest, now)
         )
         conn.commit()
         yield {"type": "analysis_done", "label": "Summary digest", "content": digest}
 
         # 3. Diff commentary (if prior run exists)
-        prior = conn.execute(
-            "SELECT id FROM runs WHERE status='done' AND id != ? ORDER BY finished_at DESC LIMIT 1",
+        cur.execute(
+            "SELECT id FROM runs WHERE status='done' AND id != %s ORDER BY finished_at DESC LIMIT 1",
             (run_id,)
-        ).fetchone()
+        )
+        prior = cur.fetchone()
 
         if prior:
             yield {"type": "analysis_start", "label": "What's new since last run"}
-            prior_titles = set(
-                r["title"] for r in conn.execute(
-                    "SELECT title FROM items WHERE run_id = ?", (prior["id"],)
-                ).fetchall() if r["title"]
-            )
+            cur.execute("SELECT title FROM items WHERE run_id = %s", (prior["id"],))
+            prior_titles = set(r["title"] for r in cur.fetchall() if r["title"])
             new_items = [dict(r) for r in items if r["title"] and r["title"] not in prior_titles]
             if new_items:
                 new_corpus = self._build_corpus(new_items)
@@ -248,13 +250,14 @@ What directions are emerging? What institutions are most active? What should the
                 )
             else:
                 diff = "No new items detected since the previous run."
-            conn.execute(
-                "INSERT INTO analyses (run_id, type, content, created_at) VALUES (?,?,?,?)",
+            cur.execute(
+                "INSERT INTO analyses (run_id, type, content, created_at) VALUES (%s,%s,%s,%s)",
                 (run_id, "New Since Last Run", diff, now)
             )
             conn.commit()
             yield {"type": "analysis_done", "label": "What's new since last run", "content": diff}
 
+        cur.close()
         conn.close()
 
     def _run_analysis(self, corpus: str, instruction: str) -> str:
