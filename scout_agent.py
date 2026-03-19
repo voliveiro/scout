@@ -180,7 +180,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
             self.SCRAPE_SYSTEM_RESEARCH
             if source_type == "Research"
             else self.SCRAPE_SYSTEM_EVENTS
-        ).format(today=today)
+        ).replace("{today}", today)
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
