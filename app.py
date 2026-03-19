@@ -6,39 +6,40 @@ Sibling to Nuncio (port 5001)
 
 import os
 import json
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import threading
 from datetime import datetime
-from flask import Flask, jsonify, request, render_template, Response, stream_with_context
+from flask import Flask, jsonify, request, render_template, Response, stream_with_context, make_response
 from dotenv import load_dotenv
 from scout_agent import ScoutAgent
 
 load_dotenv()
 
 app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "scout.db")
 
 # ── Database ──────────────────────────────────────────────────────────────────
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"), sslmode='require')
     return conn
 
 def init_db():
     conn = get_db()
-    conn.executescript("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS runs (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             started_at  TEXT NOT NULL,
             finished_at TEXT,
             status      TEXT DEFAULT 'running',
             total_urls  INTEGER DEFAULT 0,
             total_items INTEGER DEFAULT 0
-        );
-
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS items (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             run_id      INTEGER NOT NULL,
             entity      TEXT NOT NULL,
             type        TEXT NOT NULL,
@@ -47,33 +48,37 @@ def init_db():
             author      TEXT,
             speaker     TEXT,
             summary     TEXT,
-            first_seen  TEXT NOT NULL,
-            FOREIGN KEY (run_id) REFERENCES runs(id)
-        );
-
+            first_seen  TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS analyses (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             run_id      INTEGER NOT NULL,
             type        TEXT NOT NULL,
             content     TEXT NOT NULL,
-            created_at  TEXT NOT NULL,
-            FOREIGN KEY (run_id) REFERENCES analyses(id)
-        );
-
+            created_at  TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS sources (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            id      SERIAL PRIMARY KEY,
             entity  TEXT NOT NULL,
             type    TEXT NOT NULL,
             url     TEXT NOT NULL UNIQUE
-        );
+        )
     """)
     conn.commit()
+    cur.close()
     conn.close()
+
 
 def seed_sources():
     """Load sources from sources.csv if table is empty."""
     conn = get_db()
-    count = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM sources")
+    count = cur.fetchone()[0]
     if count == 0:
         import csv
         csv_path = os.path.join(os.path.dirname(__file__), "sources.csv")
@@ -81,23 +86,29 @@ def seed_sources():
             with open(csv_path) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO sources (entity, type, url) VALUES (?,?,?)",
+                    cur.execute(
+                        "INSERT INTO sources (entity, type, url) VALUES (%s,%s,%s) ON CONFLICT (url) DO NOTHING",
                         (row["Entity"], row["Type"], row["URL"])
                     )
-            conn.commit()
+        conn.commit()
+    cur.close()
     conn.close()
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    resp = make_response(render_template("index.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 @app.route("/api/sources", methods=["GET"])
 def get_sources():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM sources ORDER BY entity, type").fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM sources ORDER BY entity, type")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -105,64 +116,73 @@ def get_sources():
 def add_source():
     data = request.json
     conn = get_db()
+    cur = conn.cursor()
     try:
-        conn.execute(
-            "INSERT INTO sources (entity, type, url) VALUES (?,?,?)",
+        cur.execute(
+            "INSERT INTO sources (entity, type, url) VALUES (%s,%s,%s) ON CONFLICT (url) DO NOTHING",
             (data["entity"], data["type"], data["url"])
         )
         conn.commit()
         return jsonify({"status": "ok"})
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "URL already exists"}), 409
+    except Exception as e:
+        return jsonify({"error": str(e)}), 409
     finally:
+        cur.close()
         conn.close()
 
 @app.route("/api/sources/<int:source_id>", methods=["DELETE"])
 def delete_source(source_id):
     conn = get_db()
-    conn.execute("DELETE FROM sources WHERE id = ?", (source_id,))
+    cur = conn.cursor()
+    cur.execute("DELETE FROM sources WHERE id = %s", (source_id,))
     conn.commit()
+    cur.close()
     conn.close()
     return jsonify({"status": "ok"})
 
 @app.route("/api/runs", methods=["GET"])
 def get_runs():
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM runs ORDER BY started_at DESC LIMIT 20"
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM runs ORDER BY started_at DESC LIMIT 20")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/runs/<int:run_id>/items", methods=["GET"])
 def get_run_items(run_id):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run_id,)
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM items WHERE run_id = %s ORDER BY entity, type", (run_id,))
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/runs/latest/items", methods=["GET"])
 def get_latest_items():
     conn = get_db()
-    run = conn.execute(
-        "SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 1"
-    ).fetchone()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 1")
+    run = cur.fetchone()
     if not run:
+        cur.close()
+        conn.close()
         return jsonify([])
-    rows = conn.execute(
-        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run["id"],)
-    ).fetchall()
+    cur.execute("SELECT * FROM items WHERE run_id = %s ORDER BY entity, type", (run["id"],))
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/runs/<int:run_id>/analyses", methods=["GET"])
 def get_analyses(run_id):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM analyses WHERE run_id = ? ORDER BY created_at", (run_id,)
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM analyses WHERE run_id = %s ORDER BY created_at", (run_id,))
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -170,24 +190,19 @@ def get_analyses(run_id):
 def get_diff():
     """Return items that are new since the previous run."""
     conn = get_db()
-    runs = conn.execute(
-        "SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 2"
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT id FROM runs WHERE status = 'done' ORDER BY finished_at DESC LIMIT 2")
+    runs = cur.fetchall()
     if len(runs) < 2:
+        cur.close()
         conn.close()
         return jsonify({"message": "Need at least two completed runs to diff.", "items": []})
     latest_id, prev_id = runs[0]["id"], runs[1]["id"]
-    prev_titles = set(
-        r["title"] for r in conn.execute(
-            "SELECT title FROM items WHERE run_id = ?", (prev_id,)
-        ).fetchall() if r["title"]
-    )
-    new_items = [
-        dict(r) for r in conn.execute(
-            "SELECT * FROM items WHERE run_id = ?", (latest_id,)
-        ).fetchall()
-        if r["title"] and r["title"] not in prev_titles
-    ]
+    cur.execute("SELECT title FROM items WHERE run_id = %s", (prev_id,))
+    prev_titles = set(r["title"] for r in cur.fetchall() if r["title"])
+    cur.execute("SELECT * FROM items WHERE run_id = %s", (latest_id,))
+    new_items = [dict(r) for r in cur.fetchall() if r["title"] and r["title"] not in prev_titles]
+    cur.close()
     conn.close()
     return jsonify({"new_count": len(new_items), "items": new_items})
 
@@ -195,13 +210,14 @@ def get_diff():
 def get_digest(run_id):
     """Return a plain-text shareable digest for a run."""
     conn = get_db()
-    run = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
-    items = conn.execute(
-        "SELECT * FROM items WHERE run_id = ? ORDER BY entity, type", (run_id,)
-    ).fetchall()
-    analyses = conn.execute(
-        "SELECT * FROM analyses WHERE run_id = ?", (run_id,)
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM runs WHERE id = %s", (run_id,))
+    run = cur.fetchone()
+    cur.execute("SELECT * FROM items WHERE run_id = %s ORDER BY entity, type", (run_id,))
+    items = cur.fetchall()
+    cur.execute("SELECT * FROM analyses WHERE run_id = %s", (run_id,))
+    analyses = cur.fetchall()
+    cur.close()
     conn.close()
 
     if not run:
@@ -214,13 +230,11 @@ def get_digest(run_id):
     lines.append(f"Items collected: {run['total_items']}")
     lines.append("")
 
-    # Analysis sections
     for a in analyses:
         lines.append(f"── {a['type'].upper()} ──")
         lines.append(a["content"])
         lines.append("")
 
-    # Items by institution
     entities = list(dict.fromkeys(r["entity"] for r in items))
     for entity in entities:
         entity_items = [r for r in items if r["entity"] == entity]
@@ -258,7 +272,7 @@ def start_run():
         global _run_active
         _run_active = True
         try:
-            agent = ScoutAgent(DB_PATH, os.getenv("ANTHROPIC_API_KEY"))
+            agent = ScoutAgent(os.getenv("DATABASE_URL"), os.getenv("ANTHROPIC_API_KEY"))
             for event in agent.run():
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
@@ -278,7 +292,7 @@ def start_run():
 def analyse_run(run_id):
     """Run analysis agents over a completed run's items."""
     def generate():
-        agent = ScoutAgent(DB_PATH, os.getenv("ANTHROPIC_API_KEY"))
+        agent = ScoutAgent(os.getenv("DATABASE_URL"), os.getenv("ANTHROPIC_API_KEY"))
         for event in agent.analyse(run_id):
             yield f"data: {json.dumps(event)}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
