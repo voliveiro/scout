@@ -305,8 +305,13 @@ def analyse_run(run_id):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
+try:
     init_db()
     seed_sources()
+except Exception as e:
+    print(f"STARTUP ERROR: {e}", flush=True)
+    raise
+
+if __name__ == "__main__":
     print("Scout running on http://localhost:5002")
     app.run(host="0.0.0.0", port=5002, debug=True)
