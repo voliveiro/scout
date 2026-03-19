@@ -460,12 +460,95 @@ body {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg-rule); }
 ::-webkit-scrollbar-thumb { background: var(--border-dk); border-radius: 2px; }
+
+/* ── HAMBURGER ── */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: rgba(255,255,255,0.7);
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.hamburger:hover { color: #fff; }
+
+/* ── SIDEBAR OVERLAY (mobile) ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 99;
+}
+.sidebar-overlay.open { display: block; }
+
+/* ── MOBILE BREAKPOINT ── */
+@media (max-width: 640px) {
+
+  /* Allow full scroll instead of clipped flex */
+  .shell { height: auto; min-height: 100vh; }
+  .body  { overflow: visible; }
+  .main  { overflow: visible; min-width: 0; }
+
+  /* Show hamburger, hide masthead subtitle */
+  .hamburger { display: flex; align-items: center; }
+  .masthead-sub { display: none; }
+  .masthead { padding: 0 16px; gap: 12px; }
+
+  /* Sidebar slides in as a drawer */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    width: 240px;
+    padding-top: 60px;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Toolbar: wrap and tighten */
+  .toolbar {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .toolbar .spacer { display: none; }
+  .toolbar .prog-wrap { order: 10; flex-basis: 100%; max-width: 100%; margin-top: 2px; }
+  .toolbar .prog-label { order: 11; }
+
+  .btn { padding: 7px 12px; font-size: 12px; }
+
+  /* Panels scroll naturally */
+  .panel {
+    padding: 16px 14px;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  /* Sources: stack the add-form vertically */
+  .add-form { flex-direction: column; }
+  .inp.sm, .inp.wide { width: 100%; }
+
+  /* Sources table: hide URL column, show as sub-row */
+  .sources-table th:nth-child(4),
+  .sources-table td:nth-child(4) { display: none; }
+
+  /* Run rows: stack */
+  .run-row { flex-wrap: wrap; gap: 8px; }
+  .run-date { min-width: auto; }
+}
 </style>
 </head>
 <body>
 <div class="shell">
 
   <div class="topbar">
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
     <div class="brand">
       <span class="brand-name">SCOUT</span>
       <span class="brand-sub">Research Intelligence Agent</span>
@@ -476,8 +559,10 @@ body {
     </div>
   </div>
 
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
   <div class="body">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="nav-section">Views</div>
       <div class="nav-item active" onclick="nav('results')" id="nav-results"><span class="icon">◎</span> Latest Results</div>
       <div class="nav-item" onclick="nav('analysis')" id="nav-analysis"><span class="icon">◈</span> Analysis</div>
@@ -561,6 +646,16 @@ let currentRunId = null;
 let activePanel = 'results';
 let activeEventSource = null;
 
+// ── Sidebar (mobile) ────────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
 // ── Navigation ──────────────────────────────────────────────────────────────
 function nav(name) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -568,6 +663,7 @@ function nav(name) {
   document.getElementById('nav-' + name).classList.add('active');
   document.getElementById('panel-' + name).classList.add('active');
   activePanel = name;
+  closeSidebar();
   if (name === 'sources') loadSources();
   if (name === 'runs') loadRuns();
   if (name === 'diff') loadDiff();
