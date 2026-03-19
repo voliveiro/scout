@@ -649,6 +649,12 @@ function handleRunEvent(event, state) {
   else if (event.type === 'url_error') {
     state.done++;
     log(`  ✗ ${event.url}: ${event.error}`, 'error');
+    appendResultCard({
+      entity: event.entity,
+      source_type: 'Error',
+      items: [],
+      error: event.error
+    });
   }
   else if (event.type === 'run_complete') {
     setStatus('done', 'DONE');
@@ -668,6 +674,17 @@ function appendResultCard(event) {
   if (empty) empty.remove();
 
   const card = document.createElement('div');
+  if (event.error) {
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">${event.entity}</span>
+        <span class="tag" style="background:#fdecea;color:#c0392b">Skipped</span>
+      </div>
+      <div class="card-body"><div style="font-size:13px;color:#c0392b">${event.error}</div></div>`;
+    content.appendChild(card);
+    return;
+  }
   card.className = 'card';
   const itemsHtml = (event.items || []).map(it => `
     <div class="item">

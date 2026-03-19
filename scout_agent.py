@@ -56,7 +56,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
 
     def __init__(self, db_url: str, api_key: str):
         self.db_url = db_url
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
 
     def get_db(self):
         conn = psycopg2.connect(self.db_url, sslmode='disable')
