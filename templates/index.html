@@ -533,7 +533,7 @@ body {
           <div class="card-header"><span class="card-title">Source URLs</span></div>
           <div class="card-body">
             <table class="sources-table">
-              <thead><tr><th>Institution</th><th>Type</th><th>URL</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>Institution</th><th>Type</th><th>URL</th><th></th></tr></thead>
               <tbody id="sourcesBody"></tbody>
             </table>
             <div class="add-form">
@@ -813,11 +813,13 @@ function downloadDigest() { if (currentRunId) viewDigest(currentRunId); }
 async function loadSources() {
   const resp = await fetch('/api/sources');
   const sources = await resp.json();
-  document.getElementById('sourcesBody').innerHTML = sources.map(s => `
+  console.log('Sources loaded:', sources.length, sources.map(s => s.entity));
+  document.getElementById('sourcesBody').innerHTML = sources.map((s, i) => `
     <tr>
+      <td style="color:var(--ink4);font-size:11px;font-weight:600;width:32px">${i + 1}</td>
       <td>${s.entity}</td>
       <td><span class="tag ${s.type.toLowerCase()}">${s.type}</span></td>
-      <td style="font-size:10px;color:var(--text3)">${s.url}</td>
+      <td style="font-size:10px;color:var(--ink4);word-break:break-all;font-family:monospace">${s.url}</td>
       <td><button class="del-btn" onclick="deleteSource(${s.id})">✕</button></td>
     </tr>`).join('');
 }
