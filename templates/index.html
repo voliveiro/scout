@@ -528,15 +528,14 @@ body {
       </div>
 
       <!-- SOURCES -->
-      <div class="panel" id="panel-sources">
-        <div class="card">
+       <div class="panel" id="panel-sources">
+        <div class="card" style="display:flex;flex-direction:column;flex:1;min-height:0">
           <div class="card-header"><span class="card-title">Source URLs</span></div>
-          <div class="card-body">
+          <div class="card-body" style="flex:1;overflow-y:auto;min-height:0">
             <table class="sources-table">
               <thead><tr><th>#</th><th>Institution</th><th>Type</th><th>URL</th><th></th></tr></thead>
               <tbody id="sourcesBody"></tbody>
             </table>
-            <div class="add-form">
               <input class="inp sm" id="addEntity" placeholder="Institution" />
               <select class="inp sm" id="addType" style="cursor:pointer">
                 <option>Research</option><option>Events</option>
