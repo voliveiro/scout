@@ -106,7 +106,15 @@ Your job is to write a concise, useful analytical summary for a team of governan
             }
 
             try:
+                yield {
+                    "type": "log",
+                    "message": f"Calling API for {source['url']}…"
+                }
                 items = self._scrape(source["url"], source["type"])
+                yield {
+                    "type": "log",
+                    "message": f"API returned {len(items)} items."
+                }
                 saved = 0
                 for item in items:
                     cur.execute(
@@ -166,6 +174,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
         }
 
     def _scrape(self, url: str, source_type: str) -> list:
+        print(f"SCRAPE START: {url}", flush=True)
         today = datetime.now().strftime("%d %B %Y")
         system = (
             self.SCRAPE_SYSTEM_RESEARCH
@@ -184,6 +193,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
             }]
         )
 
+        print(f"SCRAPE API DONE: {url}", flush=True)
         raw = ""
         for block in response.content:
             if block.type == "text":

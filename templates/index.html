@@ -637,6 +637,9 @@ function handleRunEvent(event, state) {
   else if (event.type === 'url_start') {
     log(`→ [${event.index+1}/${state.total}] ${event.entity} / ${event.source_type}`, 'heading');
   }
+  else if (event.type === 'log') {
+    log(`  ${event.message}`);
+  }
   else if (event.type === 'url_done') {
     state.done++;
     const pct = (state.done / state.total * 100).toFixed(0);
