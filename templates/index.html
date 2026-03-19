@@ -533,7 +533,7 @@ body {
           <div class="card-header"><span class="card-title">Source URLs</span></div>
           <div class="card-body" style="flex:1;overflow-y:auto;min-height:0">
             <table class="sources-table">
-              <thead><tr><th>#</th><th>Institution</th><th>Type</th><th>URL</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>Ihttps://www.hertie-school.org/en/fundamental-rights/research-projectsnstitution</th><th>Type</th><th>URL</th><th></th></tr></thead>
               <tbody id="sourcesBody"></tbody>
             </table>
               <input class="inp sm" id="addEntity" placeholder="Institution" />
@@ -828,6 +828,15 @@ async function addSource() {
   const type = document.getElementById('addType').value;
   const url = document.getElementById('addUrl').value.trim();
   if (!entity || !url) return;
+
+  // Duplicate URL check against live data
+  const existing = await fetch('/api/sources').then(r => r.json());
+  const duplicate = existing.find(s => s.url.trim() === url);
+  if (duplicate) {
+    alert(`This URL is already registered under "${duplicate.entity}".`);
+    return;
+  }
+
   await fetch('/api/sources', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
