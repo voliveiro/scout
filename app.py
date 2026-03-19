@@ -263,6 +263,12 @@ def get_digest(run_id):
 _run_lock = threading.Lock()
 _run_active = False
 
+@app.route("/api/stop", methods=["POST"])
+def stop_run():
+    global _run_active
+    _run_active = False
+    return jsonify({"status": "ok"})
+
 @app.route("/api/run", methods=["POST"])
 def start_run():
     global _run_active
@@ -275,6 +281,9 @@ def start_run():
         try:
             agent = ScoutAgent(os.getenv("DATABASE_URL"), os.getenv("ANTHROPIC_API_KEY"))
             for event in agent.run():
+                if not _run_active:
+                    yield f"data: {json.dumps({'type': 'stopped'})}\n\n"
+                    break
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
             _run_active = False

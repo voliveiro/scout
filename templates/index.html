@@ -492,6 +492,7 @@ body {
     <div class="main">
       <div class="toolbar">
         <button class="btn primary" id="runBtn" onclick="startRun()">▶ RUN SCOUT</button>
+         <button class="btn btn-secondary" id="stopBtn" onclick="stopRun()" disabled>Stop</button>
         <button class="btn" id="analyseBtn" onclick="runAnalysis()" disabled>◈ ANALYSE</button>
         <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
         <div class="prog-label" id="progLabel"></div>
@@ -591,6 +592,7 @@ function log(msg, cls='') {
 // ── Run ───────────────────────────────────────────────────────────────────────
 async function startRun() {
   document.getElementById('runBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
   document.getElementById('analyseBtn').disabled = true;
   document.getElementById('digestBtn').disabled = true;
   document.getElementById('resultsContent').innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">Scanning…</div></div>';
@@ -625,6 +627,14 @@ async function startRun() {
       handleRunEvent(event, { get total() { return total; }, set total(v) { total = v; }, get done() { return done; }, set done(v) { done = v; } });
     }
   }
+}
+
+async function stopRun() {
+  await fetch('/api/stop', { method: 'POST' });
+  setStatus('idle', 'Stopped');
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  log('Run stopped by user.', 'error');
 }
 
 function handleRunEvent(event, state) {
