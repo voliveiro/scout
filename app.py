@@ -21,7 +21,7 @@ app = Flask(__name__)
 # ── Database ──────────────────────────────────────────────────────────────────
 
 def get_db():
-    conn = psycopg2.connect(os.getenv("DATABASE_URL"), sslmode='require')
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"), sslmode='disable')
     return conn
 
 def init_db():
