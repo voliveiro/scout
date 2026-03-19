@@ -252,10 +252,12 @@ def get_digest(run_id):
                 lines.append(f"  {item['summary']}")
         lines.append("")
 
+    run_date = datetime.fromisoformat(run["started_at"]).strftime("%Y%m%d-%H%M")
+    
     return Response(
         "\n".join(lines),
         mimetype="text/plain",
-        headers={"Content-Disposition": f"attachment; filename=scout_digest_{run_id}.txt"}
+        headers={"Content-Disposition": f"attachment; filename=scout_digest_{run_date}.txt"}
     )
 
 # ── Run endpoint with SSE streaming ──────────────────────────────────────────
