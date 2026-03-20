@@ -122,7 +122,15 @@ for _ in agent.run(): pass
 
 ## A note on costs
 
-Scout uses the Anthropic API with web search enabled. Each full run makes approximately 19–22 API calls (one per source URL, plus analysis). Using Claude Sonnet, a full run typically costs under $0.50 USD. API credits are managed separately from a Claude.ai Pro subscription at console.anthropic.com.
+Scout uses the Anthropic API with web search enabled. Each full run makes approximately 19–22 API calls (one per source URL, plus three analysis passes).
+
+**Scraping vs. analysis models**
+Scraping (one call per source URL) uses **Claude Haiku**, which is fast and well-suited to structured extraction. Analysis (Executive Summary, Thematic Clusters, What's New) uses **Claude Sonnet**, where output quality matters more. This split keeps a full run well under $0.10 USD in most cases — roughly 5–10× cheaper than running everything on Sonnet.
+
+**24-hour cooldown**
+Scout enforces a 24-hour gap between runs. This prevents accidental repeated runs from accumulating cost, particularly useful when sharing the tool with a team. The cooldown is enforced server-side; the UI shows how long until the next run is available.
+
+API credits are managed separately from a Claude.ai Pro subscription at console.anthropic.com. Setting a monthly spending limit there is a good backstop.
 
 ---
 
