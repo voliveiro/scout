@@ -65,6 +65,32 @@ If you cannot find any items within the past 30 days, return [].
 Always return all fields (title, speaker, date, summary) in English, translating from the source language if necessary.
 """
 
+    SCRAPE_SYSTEM_COURSES = """You are Scout, a research intelligence agent working for a governance research team.
+You are given a URL for a policy institution's courses or programmes page.
+Today's date is {today}.
+
+Your task:
+1. Use web_search to visit the URL and extract courses currently running or starting within the next 6 months.
+2. Include both semester-length degree courses AND short executive education or professional development programmes.
+3. Ignore courses that concluded more than 30 days ago.
+
+Return ONLY a JSON array. No markdown, no explanation, no preamble.
+Format:
+[
+  {
+    "title": "Full title of the course or programme",
+    "author": "Lead faculty or instructor name(s), or empty string if not found",
+    "level": "One of: Degree Programme, Executive Education, Short Course, or Professional Development",
+    "date": "Start date, duration, or semester (e.g. 'Spring 2026', '15–19 March 2026', '10-week programme')",
+    "summary": "One or two sentences describing what this course covers and who it is for."
+  }
+]
+
+If you cannot find any relevant courses, return [].
+
+Always return all fields in English, translating from the source language if necessary.
+"""
+
     ANALYSIS_SYSTEM = """You are Scout's analysis layer. You have been given a structured dataset of recent research publications and events collected from major policy institutions (Harvard Kennedy School, Oxford Blavatnik, Lee Kuan Yew School, Brookings, Chatham House, RAND).
 
 Your job is to write a concise, useful analytical summary for a team of governance researchers and public servants. Write in plain, direct prose — not bullet points. No preamble. Be specific, naming actual titles and institutions where relevant.
@@ -123,8 +149,8 @@ Your job is to write a concise, useful analytical summary for a team of governan
                 for item in items:
                     cur.execute(
                         """INSERT INTO items
-                           (run_id, entity, type, url, title, author, speaker, summary, date, first_seen)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                           (run_id, entity, type, url, title, author, speaker, summary, date, level, first_seen)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
                             run_id,
                             source["entity"],
@@ -135,6 +161,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
                             item.get("speaker", ""),
                             item.get("summary", ""),
                             item.get("date", ""),
+                            item.get("level", ""),
                             now
                         )
                     )
@@ -184,11 +211,13 @@ Your job is to write a concise, useful analytical summary for a team of governan
     def _scrape(self, url: str, source_type: str) -> list:
         print(f"SCRAPE START: {url}", flush=True)
         today = datetime.now().strftime("%d %B %Y")
-        system = (
-            self.SCRAPE_SYSTEM_RESEARCH
-            if source_type == "Research"
-            else self.SCRAPE_SYSTEM_EVENTS
-        ).replace("{today}", today)
+        if source_type == "Research":
+            system = self.SCRAPE_SYSTEM_RESEARCH
+        elif source_type == "Courses":
+            system = self.SCRAPE_SYSTEM_COURSES
+        else:
+            system = self.SCRAPE_SYSTEM_EVENTS
+        system = system.replace("{today}", today)
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",

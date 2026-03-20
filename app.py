@@ -71,6 +71,7 @@ def init_db():
         )
     """)
     cur.execute("ALTER TABLE sources ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE")
+    cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS level TEXT DEFAULT ''")
     conn.commit()
     cur.close()
     conn.close()
