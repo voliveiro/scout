@@ -576,6 +576,7 @@ body {
     <div class="main">
       <div class="toolbar">
         <button class="btn primary" id="runBtn" onclick="startRun()">▶ RUN SCOUT</button>
+        <span id="cooldownMsg" style="display:none;font-size:11px;color:var(--ink4);white-space:nowrap"></span>
          <button class="btn btn-secondary" id="stopBtn" onclick="stopRun()" disabled>Stop</button>
         <button class="btn" id="analyseBtn" onclick="runAnalysis()" disabled>◈ ANALYSE</button>
         <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
@@ -701,6 +702,23 @@ function log(msg, cls='') {
 // ── Run ───────────────────────────────────────────────────────────────────────
 async function startRun() {
   document.getElementById('runBtn').disabled = true;
+
+  const resp = await fetch('/api/run', { method: 'POST' });
+
+  // Cooldown: backend returns JSON, not a stream
+  if (resp.headers.get('content-type')?.includes('application/json')) {
+    const data = await resp.json();
+    if (data.status === 'cooldown') {
+      const msg = document.getElementById('cooldownMsg');
+      msg.style.display = '';
+      msg.textContent = data.message;
+      return;
+    }
+    // Other JSON (e.g. already-running error) — re-enable and bail
+    document.getElementById('runBtn').disabled = false;
+    return;
+  }
+
   document.getElementById('stopBtn').disabled = false;
   document.getElementById('analyseBtn').disabled = true;
   document.getElementById('digestBtn').disabled = true;
@@ -713,13 +731,6 @@ async function startRun() {
   let done = 0;
 
   if (activeEventSource) activeEventSource.close();
-  activeEventSource = new EventSource('/api/run');
-
-  // POST to trigger, SSE streams back
-  // Actually we need to POST first:
-  activeEventSource.close();
-
-  const resp = await fetch('/api/run', { method: 'POST' });
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -1111,6 +1122,20 @@ async function deleteSource(id) {
     currentRunId = latest.id;
     document.getElementById('digestBtn').disabled = false;
     document.getElementById('analyseBtn').disabled = false;
+
+    // Cooldown: block Run if a run completed within the last 24 hours
+    if (latest.finished_at && latest.status === 'done') {
+      const finishedAt = new Date(latest.finished_at);
+      const hoursAgo = (Date.now() - finishedAt) / (1000 * 60 * 60);
+      if (hoursAgo < 24) {
+        const hoursRemaining = Math.ceil(24 - hoursAgo);
+        document.getElementById('runBtn').disabled = true;
+        const msg = document.getElementById('cooldownMsg');
+        msg.style.display = '';
+        msg.textContent = `Last run ${Math.floor(hoursAgo)}h ago · next run in ${hoursRemaining}h`;
+      }
+    }
+
     await viewRun(latest.id);
     const analyses = await fetch(`/api/runs/${latest.id}/analyses`).then(r=>r.json());
     if (analyses.length) {

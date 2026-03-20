@@ -6,6 +6,7 @@ Sibling to Nuncio (port 5001)
 
 import os
 import json
+import math
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import threading
@@ -309,6 +310,23 @@ def start_run():
     global _run_active
     if _run_active:
         return jsonify({"error": "A run is already in progress."}), 409
+
+    # 24-hour cooldown
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT finished_at FROM runs WHERE status='done' ORDER BY finished_at DESC LIMIT 1")
+    last = cur.fetchone()
+    cur.close()
+    conn.close()
+    if last and last["finished_at"]:
+        hours_ago = (datetime.now() - datetime.fromisoformat(last["finished_at"])).total_seconds() / 3600
+        if hours_ago < 24:
+            hours_remaining = math.ceil(24 - hours_ago)
+            h = int(hours_ago)
+            return jsonify({
+                "status": "cooldown",
+                "message": f"Scout runs once every 24 hours to keep things manageable. The last run was {h} hour{'s' if h != 1 else ''} ago — next run available in {hours_remaining} hour{'s' if hours_remaining != 1 else ''}."
+            })
 
     def generate():
         global _run_active
