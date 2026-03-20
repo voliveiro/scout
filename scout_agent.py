@@ -45,9 +45,11 @@ You are given a URL for a policy institution's events page.
 Today's date is {today}.
 
 Your task:
-1. Use web_search to visit the URL and extract upcoming or recent events from the PAST 30 DAYS only.
-2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages until you either reach events older than 30 days or run out of pages. Do not go beyond page 5.
-3. Ignore events older than 30 days.
+1. Use web_search to visit the URL and extract events that either:
+   - took place within the past 30 days, OR
+   - are scheduled within the next 90 days.
+2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages as needed. Do not go beyond page 5.
+3. Ignore events that concluded more than 30 days ago.
 
 Return ONLY a JSON array. No markdown, no explanation, no preamble.
 Format:
