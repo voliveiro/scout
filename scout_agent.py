@@ -286,22 +286,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
         corpus = self._build_corpus(items)
         now = datetime.now().isoformat()
 
-        # 1. Thematic clustering
-        yield {"type": "analysis_start", "label": "Thematic clustering"}
-        themes = self._run_analysis(
-            corpus,
-            """Identify 4-6 major themes that cut across the research and events in this dataset.
-For each theme, name it, describe it in 2-3 sentences, and cite 2-3 specific items (by title and institution) that exemplify it.
-Focus on cross-institutional patterns — what are multiple institutions paying attention to simultaneously?"""
-        )
-        cur.execute(
-            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (%s,%s,%s,%s)",
-            (run_id, "Thematic Clusters", themes, now)
-        )
-        conn.commit()
-        yield {"type": "analysis_done", "label": "Thematic clustering", "content": themes}
-
-        # 2. Summary digest
+        # 1. Summary digest
         yield {"type": "analysis_start", "label": "Summary digest"}
         digest = self._run_analysis(
             corpus,
@@ -315,6 +300,21 @@ Write for a senior governance researcher who will share this with their team."""
         )
         conn.commit()
         yield {"type": "analysis_done", "label": "Summary digest", "content": digest}
+
+        # 2. Thematic clustering
+        yield {"type": "analysis_start", "label": "Thematic clustering"}
+        themes = self._run_analysis(
+            corpus,
+            """Identify 4-6 major themes that cut across the research and events in this dataset.
+For each theme, name it, describe it in 2-3 sentences, and cite 2-3 specific items (by title and institution) that exemplify it.
+Focus on cross-institutional patterns — what are multiple institutions paying attention to simultaneously?"""
+        )
+        cur.execute(
+            "INSERT INTO analyses (run_id, type, content, created_at) VALUES (%s,%s,%s,%s)",
+            (run_id, "Thematic Clusters", themes, now)
+        )
+        conn.commit()
+        yield {"type": "analysis_done", "label": "Thematic clustering", "content": themes}
 
         # 3. Diff commentary (if prior run exists)
         cur.execute(

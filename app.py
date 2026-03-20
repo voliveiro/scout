@@ -194,7 +194,7 @@ def get_latest_items():
 def get_analyses(run_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM analyses WHERE run_id = %s ORDER BY created_at", (run_id,))
+    cur.execute("SELECT * FROM analyses WHERE run_id = %s ORDER BY id", (run_id,))
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -319,10 +319,15 @@ def start_run():
                 if not _run_active:
                     yield f"data: {json.dumps({'type': 'stopped'})}\n\n"
                     break
-                yield f"data: {json.dumps(event)}\n\n"
+                if event.get('type') == 'keepalive':
+                    yield ': keepalive\n\n'
+                else:
+                    yield f"data: {json.dumps(event)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except GeneratorExit:
+            pass
         finally:
             _run_active = False
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return Response(
         stream_with_context(generate()),

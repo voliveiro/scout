@@ -679,6 +679,7 @@ function nav(name) {
   if (name === 'runs') loadRuns();
   if (name === 'diff') loadDiff();
   if (name === 'courses') loadCourses();
+  if (name === 'analysis' && currentRunId) loadAnalysis(currentRunId);
 }
 
 // ── Status ───────────────────────────────────────────────────────────────────
@@ -783,6 +784,7 @@ function handleRunEvent(event, state) {
     document.getElementById('runBtn').disabled = false;
     document.getElementById('analyseBtn').disabled = false;
     document.getElementById('digestBtn').disabled = false;
+    loadDiff();
   }
   else if (event.type === 'done') {
     document.getElementById('runBtn').disabled = false;
@@ -831,6 +833,13 @@ function appendResultCard(event) {
 }
 
 // ── Analysis ──────────────────────────────────────────────────────────────────
+async function loadAnalysis(runId) {
+  const analyses = await fetch(`/api/runs/${runId}/analyses`).then(r => r.json());
+  if (!analyses.length) return;
+  document.getElementById('analysisContent').innerHTML = '';
+  analyses.forEach(a => appendAnalysisCard({label: a.type, content: a.content}));
+}
+
 async function runAnalysis() {
   if (!currentRunId) { alert('Run Scout first.'); return; }
   document.getElementById('analyseBtn').disabled = true;
@@ -863,6 +872,7 @@ async function runAnalysis() {
       else if (event.type === 'done') {
         setStatus('done', 'DONE');
         document.getElementById('analyseBtn').disabled = false;
+        if (currentRunId) loadAnalysis(currentRunId);
       }
     }
   }
