@@ -965,15 +965,45 @@ function downloadDigest() { if (currentRunId) viewDigest(currentRunId); }
 async function loadSources() {
   const resp = await fetch('/api/sources');
   const sources = await resp.json();
-  console.log('Sources loaded:', sources.length, sources.map(s => s.entity));
-  document.getElementById('sourcesBody').innerHTML = sources.map((s, i) => `
-    <tr>
-      <td style="color:var(--ink4);font-size:11px;font-weight:600;width:32px">${i + 1}</td>
-      <td>${s.entity}</td>
-      <td><span class="tag ${s.type.toLowerCase()}">${s.type}</span></td>
-      <td style="font-size:10px;color:var(--ink4);word-break:break-all;font-family:monospace">${s.url}</td>
-      <td><button class="del-btn" onclick="deleteSource(${s.id})">✕</button></td>
-    </tr>`).join('');
+  const enabled = sources.filter(s => s.enabled !== false);
+  const disabled = sources.filter(s => s.enabled === false);
+
+  let rows = '';
+
+  enabled.forEach((s, i) => {
+    rows += `
+      <tr>
+        <td style="color:var(--ink4);font-size:11px;font-weight:600;width:32px">${i + 1}</td>
+        <td>${s.entity}</td>
+        <td><span class="tag ${s.type.toLowerCase()}">${s.type}</span></td>
+        <td style="font-size:10px;color:var(--ink4);word-break:break-all;font-family:monospace">${s.url}</td>
+        <td><button class="del-btn" title="Disable this source" onclick="toggleSource(${s.id})">✕</button></td>
+      </tr>`;
+  });
+
+  if (disabled.length) {
+    rows += `
+      <tr>
+        <td colspan="5" style="padding:14px 14px 6px;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink4);border-top:2px solid var(--border)">Disabled sources</td>
+      </tr>`;
+    disabled.forEach(s => {
+      rows += `
+        <tr style="opacity:0.45">
+          <td style="color:var(--ink4);font-size:11px;font-weight:600;width:32px">–</td>
+          <td style="color:var(--ink3)">${s.entity}</td>
+          <td><span class="tag" style="background:var(--bg-rule);color:var(--ink4)">${s.type}</span></td>
+          <td style="font-size:10px;color:var(--ink4);word-break:break-all;font-family:monospace">${s.url}</td>
+          <td><button class="del-btn" title="Re-enable this source" onclick="toggleSource(${s.id})" style="color:var(--teal)">↺</button></td>
+        </tr>`;
+    });
+  }
+
+  document.getElementById('sourcesBody').innerHTML = rows;
+}
+
+async function toggleSource(id) {
+  await fetch(`/api/sources/${id}/toggle`, { method: 'POST' });
+  loadSources();
 }
 
 async function addSource() {

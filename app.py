@@ -66,9 +66,11 @@ def init_db():
             id      SERIAL PRIMARY KEY,
             entity  TEXT NOT NULL,
             type    TEXT NOT NULL,
-            url     TEXT NOT NULL UNIQUE
+            url     TEXT NOT NULL UNIQUE,
+            enabled BOOLEAN DEFAULT TRUE
         )
     """)
+    cur.execute("ALTER TABLE sources ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE")
     conn.commit()
     cur.close()
     conn.close()
@@ -107,7 +109,7 @@ def index():
 def get_sources():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM sources ORDER BY entity, type")
+    cur.execute("SELECT * FROM sources ORDER BY enabled DESC, entity, type")
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -136,6 +138,16 @@ def delete_source(source_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM sources WHERE id = %s", (source_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route("/api/sources/<int:source_id>/toggle", methods=["POST"])
+def toggle_source(source_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE sources SET enabled = NOT enabled WHERE id = %s", (source_id,))
     conn.commit()
     cur.close()
     conn.close()

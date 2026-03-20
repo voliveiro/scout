@@ -79,7 +79,7 @@ Your job is to write a concise, useful analytical summary for a team of governan
     def run(self):
         conn = self.get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM sources ORDER BY entity, type")
+        cur.execute("SELECT * FROM sources WHERE enabled = TRUE ORDER BY entity, type")
         sources = cur.fetchall()
 
         # Create run record
