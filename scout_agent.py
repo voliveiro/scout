@@ -36,6 +36,8 @@ Format:
 ]
 
 If you cannot find any items within the past 30 days, return [].
+
+Always return all fields (title, author, date, summary) in English, translating from the source language if necessary.
 """
 
     SCRAPE_SYSTEM_EVENTS = """You are Scout, a research intelligence agent working for a governance research team.
@@ -59,6 +61,8 @@ Format:
 ]
 
 If you cannot find any items within the past 30 days, return [].
+
+Always return all fields (title, speaker, date, summary) in English, translating from the source language if necessary.
 """
 
     ANALYSIS_SYSTEM = """You are Scout's analysis layer. You have been given a structured dataset of recent research publications and events collected from major policy institutions (Harvard Kennedy School, Oxford Blavatnik, Lee Kuan Yew School, Brookings, Chatham House, RAND).
