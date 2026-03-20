@@ -7,6 +7,7 @@ Two responsibilities:
 """
 
 import json
+import threading
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
@@ -21,7 +22,7 @@ Today's date is {today}.
 
 Your task:
 1. Use web_search to visit the URL and extract research published in the PAST 30 DAYS only.
-2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages until you either reach items older than 30 days or run out of pages. Do not go beyond page 5.
+2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages until you either reach items older than 30 days or run out of pages. Do not go beyond page 3.
 3. Ignore research older than 30 days.
 
 Return ONLY a JSON array. No markdown, no explanation, no preamble.
@@ -48,7 +49,7 @@ Your task:
 1. Use web_search to visit the URL and extract events that either:
    - took place within the past 30 days, OR
    - are scheduled within the next 90 days.
-2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages as needed. Do not go beyond page 5.
+2. If the page is paginated (e.g. ?page=2, ?page=3), follow subsequent pages as needed. Do not go beyond page 3.
 3. Ignore events that concluded more than 30 days ago.
 
 Return ONLY a JSON array. No markdown, no explanation, no preamble.
@@ -142,7 +143,30 @@ Your job is to write a concise, useful analytical summary for a team of governan
                     "type": "log",
                     "message": f"Calling API for {source['url']}…"
                 }
-                items = self._scrape(source["url"], source["type"])
+
+                # Run scrape in a thread so we can yield keepalives while it blocks
+                result = [None]
+                exc = [None]
+                def do_scrape():
+                    try:
+                        result[0] = self._scrape(source["url"], source["type"])
+                    except Exception as e:
+                        exc[0] = e
+                t = threading.Thread(target=do_scrape, daemon=True)
+                t.start()
+                max_wait = 120
+                waited = 0
+                while t.is_alive() and waited < max_wait:
+                    t.join(timeout=10)
+                    waited += 10
+                    if t.is_alive() and waited < max_wait:
+                        yield {"type": "keepalive"}
+                if t.is_alive():
+                    raise TimeoutError(f"Scrape timed out after {max_wait}s — page may be unresponsive")
+                if exc[0]:
+                    raise exc[0]
+                items = result[0]
+
                 yield {
                     "type": "log",
                     "message": f"API returned {len(items)} items."

@@ -126,6 +126,21 @@ Scout uses the Anthropic API with web search enabled. Each full run makes approx
 
 ---
 
+## Coverage vs. performance trade-offs
+
+Scout is designed for speed and reliability over exhaustive coverage. A few deliberate choices shape this:
+
+**Pagination limit — 3 pages per source**
+Scout follows up to 3 pages of results per source URL. This keeps each scrape to a manageable length (typically 30–60 seconds) and reduces API cost. A higher page limit would surface more historical content but significantly slows each run and increases cost. If you need deeper coverage from a specific source, consider adding it twice with different entry URLs (e.g. page 1 and page 4).
+
+**Per-source timeout — 2 minutes**
+If a source takes longer than 2 minutes to respond — due to a slow server, an unusually large page, or a network issue — Scout skips it and marks it as unresponsive in the run log. The source will be retried on the next run. This prevents one problematic URL from stalling an entire run.
+
+**Time window**
+Research is limited to the past 30 days. Events cover a −30 to +90 day window (recent past plus upcoming). Courses cover anything running or starting within the next 6 months. Items outside these windows are ignored even if the page lists them.
+
+---
+
 ## Status
 
 This is a prototype. It works, but expect rough edges — error handling is minimal, there's no authentication on the web interface, and the analysis quality depends on how well Claude can read each institution's page structure. Contributions and issues welcome.
