@@ -22,14 +22,6 @@ Results are stored in a local SQLite database, so each run builds on the last. Y
 
 ---
 
-## Why it's built this way
-
-Scout is a deliberately simple tool. Your Anthropic API key lives in a `.env` file on the server and never touches the browser. Teammates access Scout through the web interface without any credentials of their own.
-
-It's also a working example of an agentic AI system: Scout uses Claude with web search enabled to actually visit and read each URL, rather than just pattern-matching against a static dataset. This makes it more robust to page redesigns, but also means each run has real API cost and takes a few minutes to complete.
-
----
-
 ## Setup
 
 **Requirements:** Python 3.10+, an Anthropic API key with credits
