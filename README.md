@@ -94,21 +94,7 @@ scout/
 
 **New institutions:** Add them via the Sources tab or `sources.csv`. Any URL that lists publications or events should work — Scout uses Claude with web search, so it reads the page rather than scraping HTML directly.
 
-**New analysis types:** Add a new method to the `analyse()` loop in `scout_agent.py`, following the pattern of the existing three. Each analysis is a prompt over the full corpus, streamed back to the frontend.
-
-**Scheduling:** Scout doesn't run on a schedule by default. To run it weekly, add a cron job:
-
-```bash
-# Run Scout every Monday at 8am
-0 8 * * 1 cd /path/to/scout && venv/bin/python3 -c "
-from scout_agent import ScoutAgent
-import os
-from dotenv import load_dotenv
-load_dotenv()
-agent = ScoutAgent('data/scout.db', os.getenv('ANTHROPIC_API_KEY'))
-for _ in agent.run(): pass
-"
-```
+**New analysis types:** Add a new method to the `analyse()` loop in `scout_agent.py`, following the pattern of the existing three. Each analysis is a prompt over the full corpus. 
 
 ---
 
